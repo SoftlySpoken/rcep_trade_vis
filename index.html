@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>RCEP Economy Estimates</title>
+    <style>
+    .div-a{ float:left;width:70% }
+    .div-b{ float:right;width:29% }
+    </style>
+    <!-- 引入 echarts.js -->
+    <script src="echarts.min.js"></script>
+    <script src="jquery.min.js-v=2.1.4.js"></script>
+</head>
+<body>
+    <!-- 为ECharts准备一个具备大小（宽高）的Dom -->
+    <!-- <div id="tree" style="width: 600px;height:400px;"></div> -->
+    <!-- <div id="usa-map" style="width: 600px;height:400px;"></div> -->
+    <select id="tradeType">
+    <option value="0">Export</option>
+    <option value="1">Import</option>
+    <!-- <option value="2">Surplus</option> -->
+    </select>
+    <select id="yearStat">
+    <option value="2018">2018</option>
+    <option value="2017">2017</option>
+    <option value="2016">2016</option>
+    <option value="2015">2015</option>
+    <option value="2014">2014</option>
+    </select>
+    <div class="div-b" id="tree" style="height:800px;"></div>
+    <div class="div-a" id="rcep-map" style="height:800px;"></div>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@4/dist/echarts.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-gl@1/dist/echarts-gl.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-stat@1/dist/ecStat.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@4/dist/extension/dataTool.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@4/map/js/china.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@4/map/js/world.js"></script>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=2.0&ak=KWMExbZewrn6fqFwasboREqLLXIcquIP"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@4/dist/extension/bmap.min.js"></script>
+    <script type="text/javascript">
+        // 基于准备好的dom，初始化echarts实例
+        var myChart1 = echarts.init(document.getElementById('tree'), 'light');
+        var myChart2 = echarts.init(document.getElementById('rcep-map'));
+        var selectCountryA = "";
+        var selectCountryB = "";
+        var trade_type = "export";  // export OR import OR surplus
+        var year_stat = "2018"; // 2014, 2015, 2016, 2017, 2018
+
+        // Initialization
+        myChart1.showLoading();
+        $.get('rcep_data/trade_zero.json', function (diskData) {
+            myChart1.hideLoading();
+
+            var formatUtil = echarts.format;
+
+            myChart1.setOption(option = {
+
+                title: {
+                    text: 'Product Categories',
+                    left: 'center'
+                },
+
+                tooltip: {
+                    formatter: function (info) {
+                        var value = info.value;
+                        var treePathInfo = info.treePathInfo;
+                        var treePath = [];
+
+                        for (var i = 1; i < treePathInfo.length; i++) {
+                            treePath.push(treePathInfo[i].name);
+                        }
+
+                        return [
+                            '<div class="tooltip-title">' + formatUtil.encodeHTML(treePath.join('/')) + '</div>',
+                            formatUtil.addCommas(value) + ' US$ Thousand',
+                        ].join('');
+                    }
+                },
+
+                series: [
+                    {
+                        name: 'All Categories',
+                        type: 'treemap',
+                        visibleMin: 0,
+                        label: {
+                            show: true,
+                            formatter: '{b}'
+                        },
+                        itemStyle: {
+                            borderColor: '#fff',
+                            gapWidth: 5,
+                        },
+                        data: diskData
+                    }
+                ]
+            });
+        });
+
+        myChart2.showLoading();
+
+        $.get('rcep_data/Asian.json', function (usaJson) {
+            myChart2.hideLoading();
+            
+            echarts.registerMap('RCEP', usaJson, {
+                // 'Australia': {              // 澳大利亚
+                Australia: {
+                    left: -100,
+                    top: 3000,
+                    width: 1500
+                },
+                'New Zealand': {       // 新西兰
+                    left: 500,
+                    top: 2000,
+                    width: 2000
+                },
+                Brunei: {
+                    left: 6500,
+                    top: 3500,
+                    width: 800
+                },
+                Singapore: {
+                    left: 2000,
+                    top: 2000,
+                    width: 800
+                }
+            });
+            option = {
+                title: {
+                    text: 'What did RCEP countries ' + trade_type + ' in ' + year_stat + '?',
+                    // subtext: 'Data from www.census.gov',
+                    // sublink: 'http://www.census.gov/popest/data/datasets.html',
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'item',
+                    showDelay: 0,
+                    transitionDuration: 0.2,
+                    formatter: function (params) {
+                        console.log(params);
+                        var value = (params.data.value + '').split('.');
+                        value = value[0].replace(/(\d{1,3})(?=(?:\d{3})+(?!\d))/g, '$1,');
+                        return params.seriesName + '<br/>' + params.name + ': ' + value + ' US$ Thousand' + '<br/>' + '(' + params.data.percentage * 100 + '% of global ' + trade_type + ')';
+                        // return params.seriesName + '<br/>' + params.name + ': ' + params.data.value + ' US$ Thousand' + '<br/>' + '(' + params.data.percentage * 100 + '% of global ' + trade_type + ')';
+                    }
+                },
+                visualMap: {
+                    left: 'right',
+                    min: 500000,
+                    max: 600000000,
+                    // '#313695',
+                    inRange: {
+                        color: ['#3e44bb', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+                    },
+                    text: ['High', 'Low'],           // 文本，默认为数值文本
+                    calculable: true
+                },
+                series: [
+                    {
+                        name: 'Total ' + trade_type,
+                        type: 'map',
+                        roam: true,
+                        map: 'RCEP',
+                        label: {
+                            show: true,
+                            fontWeight: 'bold'
+                        },
+                        emphasis: {
+                            label: {
+                                show: true,
+                                fontWeight: 'bold'
+                            }
+                        },
+                        // 文本位置修正
+                        textFixed: {
+                            Australia: [0, 0]
+                        }
+                    }
+                ]
+            };
+
+            myChart2.setOption(option);
+
+            $.get('rcep_data/aggregate_' + trade_type + '_' + year_stat + '.json', function (aggregate) {
+                myChart2.hideLoading();
+                myChart2.setOption({
+                    series: [{
+                        data: aggregate
+                    }]
+                });
+            });
+
+
+            // Data source re-selection
+            $(function() {
+                $('#tradeType').on('change', function() {
+                    var val = $(this).val();
+                    if (val == "0")
+                        trade_type = "export";
+                    else if (val == "1")
+                        trade_type = "import";
+                    else if (val == "2")
+                        trade_type = "surplus";
+
+                    // Restore according to state
+                    if (selectCountryA == "" && selectCountryB == "")
+                    {
+                        // No country is selected yet
+                        myChart1.showLoading();
+                        $.get('rcep_data/trade_zero.json', function (trade_zero) {
+                            myChart1.hideLoading();
+                            myChart1.setOption({
+                                series: [{
+                                    data: trade_zero
+                                }]
+                            });
+                        });                    
+
+                        myChart2.showLoading();
+                        $.get('rcep_data/aggregate_' + trade_type + '_' + year_stat + '.json', function (aggregate) {
+                            myChart2.hideLoading();
+                            myChart2.setOption({
+                                title: {
+                                    text: 'What did RCEP countries ' + trade_type + ' in ' + year_stat + '?',
+                                },
+                                visualMap: {
+                                    min: 500000,
+                                    max: 600000000,
+                                    inRange: {
+                                        color: ['#3e44bb', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+                                    },
+                                },
+                                series: [{
+                                    name: 'Total ' + trade_type,
+                                    data: aggregate
+                                }]
+                            });
+                        });
+                    }
+                    else if (selectCountryB == "")
+                    {
+                        // Country A is selected, country B is not
+                        myChart1.showLoading();
+                        $.get('rcep_data/' + trade_type + '_' + selectCountryA + '_' + year_stat + '.json', function (changeData1) {
+                            changeData1.forEach(item=>{
+                                if (item.name == 'Capital goods')
+                                    item.itemStyle = {color: '#0a2145'};
+                                else if (item.name == 'Consumer goods')
+                                    item.itemStyle = {color: '#144840'};
+                                else if (item.name == 'Intermediate goods')
+                                    item.itemStyle = {color: '#346e57'};
+                                else if (item.name == 'Mach and Elec')
+                                    item.itemStyle = {color: '#5d8461'};
+                                else if (item.name == 'Metals')
+                                    item.itemStyle = {color: '#9eb77d'};
+                                else if (item.name == 'Miscellaneous')
+                                    item.itemStyle = {color: '#415b62'};
+                                else if (item.name == 'Plastic or rubber')
+                                    item.itemStyle = {color: '#24636a'};
+                            });
+
+                            myChart1.hideLoading();
+                            myChart1.setOption({
+                                series: [{
+                                    data: changeData1
+                                }]
+                            });
+                        })
+
+                        myChart2.showLoading();
+                        $.get('rcep_data/aggregate_' + trade_type + '_' + selectCountryA + '_' + year_stat + '.json', function (aggregate) {
+                            myChart2.hideLoading();
+
+                            // Highlight country A
+                            aggregate.forEach(item=>{if (item.name == selectCountryA) item.itemStyle = {borderColor: 'red', borderWidth: 1.5}});
+
+                            var pref;
+                            if (trade_type == 'export')
+                                pref = "Import from ";
+                            else if (trade_type == 'import')
+                                pref = "Export to ";
+                            else if (trade_type == "surplus")
+                                pref = "Surplus with ";
+                            myChart2.setOption({
+                                title: {
+                                    text: 'What did ' + selectCountryA + ' ' + trade_type + ' in ' + year_stat + '?',
+                                },
+                                tooltip: {
+                                    formatter: function (params) {
+                                        console.log(params);
+                                        var value = (params.value + '').split('.');
+                                        value = value[0].replace(/(\d{1,3})(?=(?:\d{3})+(?!\d))/g, '$1,');
+                                        return params.seriesName + '<br/>' + params.name + ': ' + value + ' US$ Thousand';
+                                    }
+                                },
+                                visualMap: {
+                                    min: 0,
+                                    max: 50000000,
+                                    inRange: {
+                                        color: ['lightgreen', 'darkgreen']
+                                    }
+                                },
+                                series: [{
+                                    name: pref + selectCountryA,
+                                    data: aggregate,
+                                }]
+                            });
+                            myChart2.dispatchAction({type: 'highlight', seriesIndex: 0, name: selectCountryA});
+                        });
+                    }
+                    else
+                    {
+                        // Both country A and B are selected
+                        myChart1.showLoading();
+                        $.get('rcep_data/' + trade_type + '_' + selectCountryA + '_' + selectCountryB + '_' + year_stat + '.json', function (changeData2) {
+                            changeData2.forEach(item=>{
+                                if (item.name == 'Capital goods')
+                                    item.itemStyle = {color: '#0a2145'};
+                                else if (item.name == 'Consumer goods')
+                                    item.itemStyle = {color: '#144840'};
+                                else if (item.name == 'Intermediate goods')
+                                    item.itemStyle = {color: '#346e57'};
+                                else if (item.name == 'Mach and Elec')
+                                    item.itemStyle = {color: '#5d8461'};
+                                else if (item.name == 'Metals')
+                                    item.itemStyle = {color: '#9eb77d'};
+                                else if (item.name == 'Miscellaneous')
+                                    item.itemStyle = {color: '#415b62'};
+                                else if (item.name == 'Plastic or rubber')
+                                    item.itemStyle = {color: '#24636a'};
+                            });
+
+                            myChart1.hideLoading();
+                            myChart1.setOption({
+                                series: [{
+                                    data: changeData2,
+                                }]
+                            });
+                        })
+
+                        myChart2.showLoading();
+                        $.get('rcep_data/aggregate_' + trade_type + '_' + selectCountryA + '_' + year_stat + '.json', function (aggregate) {
+                            myChart2.hideLoading();
+
+                            // Highlight country B, keep highlighting country A
+                            aggregate.forEach(item=>{if (item.name == selectCountryB) item.itemStyle = {borderColor: 'blue', borderWidth: 1.5}; else if (item.name == selectCountryA) item.itemStyle = {borderColor: 'red', borderWidth: 1.5};});
+
+                            var prep = trade_type == 'export' ? 'to' : 'from' ;
+                            myChart2.setOption({
+                                title: {
+                                    text: 'What did ' + selectCountryA + ' ' + trade_type + ' ' + prep + ' ' + selectCountryB + ' in ' + year_stat + '?',
+                                },
+                                series: [{
+                                    data: aggregate,
+                                }]
+                            });
+                            myChart2.dispatchAction({type: 'highlight', seriesIndex: 0, name: selectCountryA});
+                            myChart2.dispatchAction({type: 'highlight', seriesIndex: 0, name: selectCountryB});
+                        });
+                    }
+                });
+            });
+            $(function() {
+                $('#yearStat').on('change', function() {
+                    year_stat = $(this).val();
+
+                    // Restore according to state
+                    if (selectCountryA == "" && selectCountryB == "")
+                    {
+                        // No country is selected yet
+                        myChart1.showLoading();
+                        $.get('rcep_data/trade_zero.json', function (trade_zero) {
+                            myChart1.hideLoading();
+                            myChart1.setOption({
+                                series: [{
+                                    data: trade_zero
+                                }]
+                            });
+                        });                    
+
+                        myChart2.showLoading();
+                        $.get('rcep_data/aggregate_' + trade_type + '_' + year_stat + '.json', function (aggregate) {
+                            myChart2.hideLoading();
+                            myChart2.setOption({
+                                title: {
+                                    text: 'What did RCEP countries ' + trade_type + ' in ' + year_stat + '?',
+                                },
+                                tooltip: {
+                                    formatter: function (params) {
+                                        console.log(params);
+                                        var value = (params.value + '').split('.');
+                                        value = value[0].replace(/(\d{1,3})(?=(?:\d{3})+(?!\d))/g, '$1,');
+                                        return params.seriesName + '<br/>' + params.name + ': ' + value + ' US$ Thousand' + '<br/>' + '(' + params.data.percentage * 100 + '% of global ' + trade_type + ')';
+                                    }
+                                },
+                                visualMap: {
+                                    min: 500000,
+                                    max: 600000000,
+                                    inRange: {
+                                        color: ['#3e44bb', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+                                    },
+                                },
+                                series: [{
+                                    name: 'Total ' + trade_type,
+                                    data: aggregate
+                                }]
+                            });
+                        });
+                    }
+                    else if (selectCountryB == "")
+                    {
+                        // Country A is selected, country B is not
+                        myChart1.showLoading();
+                        $.get('rcep_data/' + trade_type + '_' + selectCountryA + '_' + year_stat + '.json', function (changeData1) {
+                            changeData1.forEach(item=>{
+                                if (item.name == 'Capital goods')
+                                    item.itemStyle = {color: '#0a2145'};
+                                else if (item.name == 'Consumer goods')
+                                    item.itemStyle = {color: '#144840'};
+                                else if (item.name == 'Intermediate goods')
+                                    item.itemStyle = {color: '#346e57'};
+                                else if (item.name == 'Mach and Elec')
+                                    item.itemStyle = {color: '#5d8461'};
+                                else if (item.name == 'Metals')
+                                    item.itemStyle = {color: '#9eb77d'};
+                                else if (item.name == 'Miscellaneous')
+                                    item.itemStyle = {color: '#415b62'};
+                                else if (item.name == 'Plastic or rubber')
+                                    item.itemStyle = {color: '#24636a'};
+                            });
+
+                            myChart1.hideLoading();
+                            myChart1.setOption({
+                                series: [{
+                                    data: changeData1
+                                }]
+                            });
+                        })
+
+                        myChart2.showLoading();
+                        $.get('rcep_data/aggregate_' + trade_type + '_' + selectCountryA + '_' + year_stat + '.json', function (aggregate) {
+                            myChart2.hideLoading();
+
+                            // Highlight country A
+                            aggregate.forEach(item=>{if (item.name == selectCountryA) item.itemStyle = {borderColor: 'red', borderWidth: 1.5}});
+
+                            var pref;
+                            if (trade_type == 'export')
+                                pref = "Import from ";
+                            else if (trade_type == 'import')
+                                pref = "Export to ";
+                            else if (trade_type == "surplus")
+                                pref = "Surplus with ";
+                            myChart2.setOption({
+                                title: {
+                                    text: 'What did ' + selectCountryA + ' ' + trade_type + ' in ' + year_stat + '?',
+                                },
+                                tooltip: {
+                                    formatter: function (params) {
+                                        console.log(params);
+                                        var value = (params.value + '').split('.');
+                                        value = value[0].replace(/(\d{1,3})(?=(?:\d{3})+(?!\d))/g, '$1,');
+                                        return params.seriesName + '<br/>' + params.name + ': ' + value + ' US$ Thousand';
+                                    }
+                                },
+                                visualMap: {
+                                    min: 0,
+                                    max: 50000000,
+                                    inRange: {
+                                        color: ['lightgreen', 'darkgreen']
+                                    }
+                                },
+                                series: [{
+                                    name: pref + selectCountryA,
+                                    data: aggregate,
+                                }]
+                            });
+                            myChart2.dispatchAction({type: 'highlight', seriesIndex: 0, name: selectCountryA});
+                        });
+                    }
+                    else
+                    {
+                        // Both country A and B are selected
+                        myChart1.showLoading();
+                        $.get('rcep_data/' + trade_type + '_' + selectCountryA + '_' + selectCountryB + '_' + year_stat + '.json', function (changeData2) {
+                            changeData2.forEach(item=>{
+                                if (item.name == 'Capital goods')
+                                    item.itemStyle = {color: '#0a2145'};
+                                else if (item.name == 'Consumer goods')
+                                    item.itemStyle = {color: '#144840'};
+                                else if (item.name == 'Intermediate goods')
+                                    item.itemStyle = {color: '#346e57'};
+                                else if (item.name == 'Mach and Elec')
+                                    item.itemStyle = {color: '#5d8461'};
+                                else if (item.name == 'Metals')
+                                    item.itemStyle = {color: '#9eb77d'};
+                                else if (item.name == 'Miscellaneous')
+                                    item.itemStyle = {color: '#415b62'};
+                                else if (item.name == 'Plastic or rubber')
+                                    item.itemStyle = {color: '#24636a'};
+                            });
+
+                            myChart1.hideLoading();
+                            myChart1.setOption({
+                                series: [{
+                                    data: changeData2,
+                                }]
+                            });
+                        })
+
+                        myChart2.showLoading();
+                        $.get('rcep_data/aggregate_' + trade_type + '_' + selectCountryA + '_' + year_stat + '.json', function (aggregate) {
+                            myChart2.hideLoading();
+
+                            // Highlight country B, keep highlighting country A
+                            aggregate.forEach(item=>{if (item.name == selectCountryB) item.itemStyle = {borderColor: 'blue', borderWidth: 1.5}; else if (item.name == selectCountryA) item.itemStyle = {borderColor: 'red', borderWidth: 1.5};});
+
+                            var prep = trade_type == 'export' ? 'to' : 'from' ;
+                            myChart2.setOption({
+                                title: {
+                                    text: 'What did ' + selectCountryA + ' ' + trade_type + ' ' + prep + ' ' + selectCountryB + ' in ' + year_stat + '?',
+                                },
+                                series: [{
+                                    data: aggregate,
+                                }]
+                            });
+                            myChart2.dispatchAction({type: 'highlight', seriesIndex: 0, name: selectCountryA});
+                            myChart2.dispatchAction({type: 'highlight', seriesIndex: 0, name: selectCountryB});
+                        });
+                    }
+                });
+            });
+
+
+            // Interaction
+            myChart2.on('click', 'series', function (params1) {
+                // If trade_type is surplus, do nothing
+                if (trade_type == "export" || trade_type == "import")
+                {
+                    // No country A is yet selected
+                    if (selectCountryA == "")
+                    {
+                        selectCountryA = params1.name;
+
+                        myChart2.showLoading();
+                        $.get('rcep_data/aggregate_' + trade_type + '_' + selectCountryA + '_' + year_stat + '.json', function (aggregate) {
+                            myChart2.hideLoading();
+
+                            // Highlight country A
+                            aggregate.forEach(item=>{if (item.name == selectCountryA) item.itemStyle = {borderColor: 'red', borderWidth: 1.5}});
+
+                            var pref;
+                            if (trade_type == 'export')
+                                pref = "Import from ";
+                            else if (trade_type == 'import')
+                                pref = "Export to ";
+                            else if (trade_type == "surplus")
+                                pref = "Surplus with ";
+                            myChart2.setOption({
+                                title: {
+                                    text: 'What did ' + selectCountryA + ' ' + trade_type + ' in ' + year_stat + '?',
+                                },
+                                tooltip: {
+                                    formatter: function (params) {
+                                        console.log(params);
+                                        var value = (params.value + '').split('.');
+                                        value = value[0].replace(/(\d{1,3})(?=(?:\d{3})+(?!\d))/g, '$1,');
+                                        return params.seriesName + '<br/>' + params.name + ': ' + value + ' US$ Thousand';
+                                    }
+                                },
+                                visualMap: {
+                                    min: 0,
+                                    max: 50000000,
+                                    inRange: {
+                                        color: ['lightgreen', 'darkgreen']
+                                    }
+                                },
+                                series: [{
+                                    name: pref + selectCountryA,
+                                    data: aggregate,
+                                }]
+                            });
+                            myChart2.dispatchAction({type: 'highlight', seriesIndex: 0, name: selectCountryA});
+                        });
+
+                        myChart1.showLoading();
+                        $.get('rcep_data/' + trade_type + '_' + selectCountryA + '_' + year_stat + '.json', function (changeData1) {
+                            changeData1.forEach(item=>{
+                                if (item.name == 'Capital goods')
+                                    item.itemStyle = {color: '#0a2145'};
+                                else if (item.name == 'Consumer goods')
+                                    item.itemStyle = {color: '#144840'};
+                                else if (item.name == 'Intermediate goods')
+                                    item.itemStyle = {color: '#346e57'};
+                                else if (item.name == 'Mach and Elec')
+                                    item.itemStyle = {color: '#5d8461'};
+                                else if (item.name == 'Metals')
+                                    item.itemStyle = {color: '#9eb77d'};
+                                else if (item.name == 'Miscellaneous')
+                                    item.itemStyle = {color: '#415b62'};
+                                else if (item.name == 'Plastic or rubber')
+                                    item.itemStyle = {color: '#24636a'};
+                            });
+
+                            myChart1.hideLoading();
+                            myChart1.setOption({
+                                series: [{
+                                    data: changeData1
+                                }]
+                            });
+                        })
+                    }
+
+                    else
+                    {
+                        // Country A is selected, now for country B
+                        if (params1.name != selectCountryA)
+                        {
+                            selectCountryB = params1.name;
+
+                            myChart1.showLoading();
+                            $.get('rcep_data/' + trade_type + '_' + selectCountryA + '_' + selectCountryB + '_' + year_stat + '.json', function (changeData2) {
+                                changeData2.forEach(item=>{
+                                    if (item.name == 'Capital goods')
+                                        item.itemStyle = {color: '#0a2145'};
+                                    else if (item.name == 'Consumer goods')
+                                        item.itemStyle = {color: '#144840'};
+                                    else if (item.name == 'Intermediate goods')
+                                        item.itemStyle = {color: '#346e57'};
+                                    else if (item.name == 'Mach and Elec')
+                                        item.itemStyle = {color: '#5d8461'};
+                                    else if (item.name == 'Metals')
+                                        item.itemStyle = {color: '#9eb77d'};
+                                    else if (item.name == 'Miscellaneous')
+                                        item.itemStyle = {color: '#415b62'};
+                                    else if (item.name == 'Plastic or rubber')
+                                        item.itemStyle = {color: '#24636a'};
+                                });
+
+                                myChart1.hideLoading();
+                                myChart1.setOption({
+                                    series: [{
+                                        data: changeData2,
+                                    }]
+                                });
+                            })
+
+                            myChart2.showLoading();
+                            $.get('rcep_data/aggregate_' + trade_type + '_' + selectCountryA + '_' + year_stat + '.json', function (aggregate) {
+                                myChart2.hideLoading();
+
+                                // Highlight country B, keep highlighting country A
+                                aggregate.forEach(item=>{if (item.name == selectCountryB) item.itemStyle = {borderColor: 'blue', borderWidth: 1.5}; else if (item.name == selectCountryA) item.itemStyle = {borderColor: 'red', borderWidth: 1.5};});
+
+                                var prep = trade_type == 'export' ? 'to' : 'from' ;
+                                myChart2.setOption({
+                                    title: {
+                                        text: 'What did ' + selectCountryA + ' ' + trade_type + ' ' + prep + ' ' + selectCountryB + ' in ' + year_stat + '?',
+                                    },
+                                    series: [{
+                                        data: aggregate,
+                                    }]
+                                });
+                                myChart2.dispatchAction({type: 'highlight', seriesIndex: 0, name: selectCountryA});
+                                myChart2.dispatchAction({type: 'highlight', seriesIndex: 0, name: selectCountryB});
+                            });
+                        }
+
+                        // Unselect country A
+                        else
+                        {
+                            selectCountryA = "";
+                            selectCountryB = "";
+
+                            myChart2.showLoading();
+                            $.get('rcep_data/aggregate_' + trade_type + '_' + year_stat + '.json', function (aggregate) {
+                                myChart2.hideLoading();
+                                myChart2.setOption({
+                                    title: {
+                                        text: 'What did RCEP countries ' + trade_type + ' in ' + year_stat + '?',
+                                    },
+                                    tooltip: {
+                                        formatter: function (params) {
+                                            console.log(params);
+                                            var value = (params.value + '').split('.');
+                                            value = value[0].replace(/(\d{1,3})(?=(?:\d{3})+(?!\d))/g, '$1,');
+                                            return params.seriesName + '<br/>' + params.name + ': ' + value + ' US$ Thousand' + '<br/>' + '(' + params.data.percentage * 100 + '% of global ' + trade_type + ')';
+                                        }
+                                    },
+                                    visualMap: {
+                                        min: 500000,
+                                        max: 600000000,
+                                        inRange: {
+                                            color: ['#3e44bb', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+                                        },
+                                    },
+                                    series: [{
+                                        name: 'Total ' + trade_type,
+                                        data: aggregate
+                                    }]
+                                });
+                            });
+
+                            myChart1.showLoading();
+                            $.get('rcep_data/trade_zero.json', function (trade_zero) {
+                                myChart1.hideLoading();
+                                myChart1.setOption({
+                                    series: [{
+                                        data: trade_zero
+                                    }]
+                                });
+                            });
+                        }
+                    }
+                }
+            });
+        });;
+    </script>
+</body>
+</html>
